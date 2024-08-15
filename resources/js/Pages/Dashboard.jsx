@@ -1,25 +1,48 @@
+import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
-import { Inertia } from '@inertiajs/inertia';
-import React, { useState } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Fetch your API_KEY from environment variables or config
+const API_KEY = 'AIzaSyCB2kylilC7_PmWhRy24i-hTzPJH9Q3yzg';  // Pastikan ini diambil dari environment variable atau konfigurasi yang aman
+const genAI = new GoogleGenerativeAI(API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
 export default function Dashboard({ auth }) {
     const [prompt, setPrompt] = useState('');
-    const [content, setContent] = useState('');
+    const [generatedContent, setGeneratedContent] = useState('');
+    const [history, setHistory] = useState([
+        {
+            role: 'user',
+            parts: [{ text: 'Hello' }]
+        },
+        {
+            role: 'model',
+            parts: [{ text: 'Great to meet you. What would you like to know?' }]
+        }
+    ]);
 
     const handleGenerateContent = async () => {
-        Inertia.post('/generate-content', { prompt }, {
-            onSuccess: (page) => {
-                const responseContent = page.props.content;
-                setContent(responseContent.text); // Update with the returned text from API
-            },
-            onError: (errors) => {
-                console.error("Error generating content", errors);
-            }
-        });
+        try {
+            // Mulai chat dengan histori percakapan
+            const chat = model.startChat({ history });
+
+            // Kirim pesan baru
+            const result = await chat.sendMessage(prompt);
+            const content = result.response.text();
+
+            // Update histori dan konten yang dihasilkan
+            setHistory([
+                ...history,
+                { role: 'user', parts: [{ text: prompt }] },
+                { role: 'model', parts: [{ text: content }] }
+            ]);
+            setGeneratedContent(content);
+        } catch (error) {
+            console.error('Error generating content:', error);
+        }
     };
 
-    
     return (
         <AuthenticatedLayout
             user={auth.user}
@@ -49,10 +72,10 @@ export default function Dashboard({ auth }) {
                                     Generate Content
                                 </button>
 
-                                {content && (
+                                {generatedContent && (
                                     <div className="mt-6">
                                         <h4 className="text-md font-semibold">Generated Content:</h4>
-                                        <p className="mt-2 p-4 bg-gray-100 rounded">{content}</p>
+                                        <p className="mt-2 p-4 bg-gray-100 rounded">{generatedContent}</p>
                                     </div>
                                 )}
                             </div>
